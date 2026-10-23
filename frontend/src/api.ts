@@ -71,3 +71,25 @@ export async function downloadNotePdf(noteId: string, title: string) {
   anchor.click();
   URL.revokeObjectURL(url);
 }
+
+async function downloadPdf(path: string, filename: string) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/api${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? 'دانلود جزوه ناموفق بود');
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+export function downloadCourseNotesPdf(courseId: string, title: string) {
+  return downloadPdf(`/courses/${courseId}/notes/pdf`, `${title}-همه-فصل‌ها.pdf`);
+}
+
+export function downloadStudentNotesPdf(classId: string) {
+  return downloadPdf(`/student/classes/${classId}/notes/pdf`, 'جزوه‌های-دوره.pdf');
+}

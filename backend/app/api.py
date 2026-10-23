@@ -58,7 +58,7 @@ from .schemas import (
     UserOut,
 )
 from .security import create_access_token, hash_password, new_invite_token, token_digest, verify_password
-from .note_pdf import render_note_pdf
+from .note_pdf import render_course_pdf, render_note_pdf
 
 
 router = APIRouter(prefix="/api")
@@ -375,7 +375,12 @@ def create_note(payload: NoteCreate, db: Db, user: CurrentUser) -> LectureNote:
 def list_notes(course_id: str, db: Db, user: CurrentUser) -> list[dict]:
     require_role(user, Role.teacher)
     owned_course(db, user, course_id)
-    notes = list(db.scalars(select(LectureNote).where(LectureNote.course_id == course_id)))
+    notes = list(db.scalars(
+        select(LectureNote)
+        .outerjoin(Topic, Topic.id == LectureNote.topic_id)
+        .where(LectureNote.course_id == course_id)
+        .order_by(Topic.sort_order, LectureNote.title)
+    ))
     result = []
     for note in notes:
         data = NoteOut.model_validate(note).model_dump()
@@ -441,6 +446,35 @@ def download_note_pdf(note_id: str, db: Db, user: CurrentUser) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
     )
+
+
+def course_pdf_response(db: Db, course: Course, notes: list[LectureNote]) -> Response:
+    notes_with_images = [
+        (note, list(db.scalars(select(NoteImage).where(NoteImage.note_id == note.id))))
+        for note in notes
+    ]
+    pdf = render_course_pdf(course.title, notes_with_images)
+    filename = quote(f"{course.title}-همه-فصل‌ها.pdf")
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+    )
+
+
+@router.get("/courses/{course_id}/notes/pdf")
+def download_course_notes_pdf(course_id: str, db: Db, user: CurrentUser) -> Response:
+    require_role(user, Role.teacher)
+    course = owned_course(db, user, course_id)
+    notes = list(db.scalars(
+        select(LectureNote)
+        .outerjoin(Topic, Topic.id == LectureNote.topic_id)
+        .where(LectureNote.course_id == course_id)
+        .order_by(Topic.sort_order, LectureNote.title)
+    ))
+    if not notes:
+        raise HTTPException(status_code=404, detail="جزوه‌ای برای این دوره وجود ندارد")
+    return course_pdf_response(db, course, notes)
 
 
 @router.put("/notes/{note_id}/publications", status_code=204)
@@ -698,8 +732,31 @@ def student_notes(class_id: str, db: Db, user: CurrentUser) -> list[LectureNote]
     return list(db.scalars(
         select(LectureNote)
         .join(NotePublication, NotePublication.note_id == LectureNote.id)
+        .outerjoin(Topic, Topic.id == LectureNote.topic_id)
         .where(NotePublication.class_id == class_id)
+        .order_by(Topic.sort_order, LectureNote.title)
     ))
+
+
+@router.get("/student/classes/{class_id}/notes/pdf")
+def download_student_course_notes_pdf(class_id: str, db: Db, user: CurrentUser) -> Response:
+    require_role(user, Role.student)
+    if not active_membership(db, user, class_id):
+        raise HTTPException(status_code=403, detail="عضویت فعال در این کلاس ندارید")
+    group = db.get(ClassGroup, class_id)
+    course = db.get(Course, group.course_id) if group else None
+    if not course:
+        raise HTTPException(status_code=404, detail="دوره پیدا نشد")
+    notes = list(db.scalars(
+        select(LectureNote)
+        .join(NotePublication, NotePublication.note_id == LectureNote.id)
+        .outerjoin(Topic, Topic.id == LectureNote.topic_id)
+        .where(NotePublication.class_id == class_id)
+        .order_by(Topic.sort_order, LectureNote.title)
+    ))
+    if not notes:
+        raise HTTPException(status_code=404, detail="جزوه‌ای برای این کلاس منتشر نشده است")
+    return course_pdf_response(db, course, notes)
 
 
 @router.get("/me/classes", response_model=list[ClassOut])

@@ -1,17 +1,22 @@
-# سامانه مدیریت دوره، بانک سؤال و آزمون‌ساز معلمان
+# سامانه مدیریت کلاس، محتوای آموزشی، بانک سؤال و آزمون‌ساز
 
 > **Project specification / implementation brief**  
-> Version: 1.0 · October 2026 · Primary product language: **Persian (fa-IR), RTL**
+> Version: 1.1 · October 2026 · Primary product language: **Persian (fa-IR), RTL**
 
 ## 1. Product vision
 
-Build a **simple, beautiful, Persian-first web app for teachers** to manage courses, topics, editable lecture notes, question banks and printable exams. Teachers can author questions manually or import AI-generated questions from validated JSON or constrained Markdown. They can select and reorder questions, assign decimal point values, and export polished **A4 Persian PDFs with or without answers**. Keep v1 intentionally small: one teacher/account initially, with ownership-ready models for later multi-teacher support.
+Build a **simple, beautiful, Persian-first teaching and learning web app** with separate teacher and student accounts. Teachers manage courses, class groups, editable lecture notes, question banks and printable exams. They decide which notes and questions are published to students, and to which class groups. Students join a specific class through its invitation link, subject to teacher approval, and can view and download the material made available to that class. Teachers can author questions manually or import AI-generated questions from validated JSON or constrained Markdown. They can select and reorder questions, assign decimal point values, and export polished **A4 Persian PDFs with or without answers**.
 
 ### Success criteria
 
 - Create a course and organize its content into subjects/topics.
+- Register and sign in as either a teacher or a student through role-appropriate account flows.
+- Let a teacher create multiple class groups for one course and manage each class roster independently.
+- Let students open a class-specific invitation link, request access and join only after teacher approval.
 - Write, edit, preview and download Markdown-based lecture notes.
 - Create, duplicate, edit, filter and delete questions of several types.
+- Publish selected notes and questions to all or selected classes while keeping drafts private.
+- Let students browse and download available question sets, without answers by default and with answers only when the teacher permits it.
 - Bulk-import agent-generated questions with validation and a preview/approval step.
 - Build, save and reopen an exam with chosen questions, ordering and per-exam marks (`0.25`, `1.5`, `2.75`, etc.).
 - Export student exam (no answers) and teacher copy (with answer key) as legible Persian PDFs.
@@ -30,7 +35,7 @@ Build a **simple, beautiful, Persian-first web app for teachers** to manage cour
 | Icons | Tabler Icons (`@tabler/icons-react`) | Visually consistent with Mantine |
 | Backend | **Python + FastAPI + Pydantic** | Easy CRUD and JSON import APIs |
 | Persistence | **PostgreSQL on Supabase**, SQLAlchemy 2, Alembic | Durable relational storage and migrations |
-| Authentication | Supabase Auth or secure app-side authentication | Protect teacher content and write APIs |
+| Authentication | Supabase Auth or secure app-side authentication | Support teacher/student accounts, secure registration and role-based access |
 | PDF | Server-rendered HTML/CSS → WeasyPrint; evaluate Chromium-based rendering if needed | Printable A4; verify RTL/math quality through actual tests |
 | Math | KaTeX/MathJax in web preview; pre-render math to PDF-compatible HTML/SVG | Math in notes and exam PDFs |
 | Hosting | **Render Static Site + Render Free Web Service + Supabase Free** | Simple GitHub-based deployments with free-tier constraints |
@@ -66,12 +71,13 @@ export function Root() {
 
 ## 3. UX and screens
 
-**Design direction:** calm, modern, teacher-friendly academic dashboard; a restrained indigo/teal palette, generous whitespace, rounded cards and clear hierarchy. Mobile responsive, but optimize lecture authoring/exam assembly for desktop first. Use Mantine `AppShell`, `NavLink`, `Card`, `DataTable` equivalent (`Table` initially), `Drawer`, `Modal`, `Stepper`, `Badge`, `MultiSelect`, `NumberInput`, `Dropzone` (if used), `Notifications`.
+**Design direction:** calm, modern, teacher- and student-friendly academic dashboard; a restrained indigo/teal palette, generous whitespace, rounded cards and clear hierarchy. Mobile responsive, but optimize lecture authoring/exam assembly for desktop first. Use Mantine `AppShell`, `NavLink`, `Card`, `DataTable` equivalent (`Table` initially), `Drawer`, `Modal`, `Stepper`, `Badge`, `MultiSelect`, `NumberInput`, `Dropzone` (if used), `Notifications`.
 
-**Navigation (all Persian):**
+**Teacher navigation (all Persian):**
 
 - `داشبورد` — recent courses, notes and exams
 - `دوره‌ها` — courses, create/edit/archive
+- `کلاس‌ها` — class groups, invitation links, join requests and rosters
 - `موضوعات` — topics within a course
 - `جزوه‌ها` — author/import/preview/download
 - `بانک سؤالات` — filter, create, edit, import and select
@@ -79,26 +85,56 @@ export function Root() {
 - `آزمون‌های ذخیره‌شده` — reopen, duplicate, export
 - `تنظیمات` — profile, exam header/defaults
 
+**Student navigation (all Persian):**
+
+- `داشبورد` — enrolled classes and recently published material
+- `کلاس‌های من` — approved memberships and pending join requests
+- `جزوه‌ها` — notes published to the student's classes
+- `سؤالات` — available questions and permitted download variants
+- `تنظیمات` — profile and account settings
+
+**Public authentication screens:**
+
+- `ورود` — sign in for both roles
+- `ثبت‌نام دانش‌آموز` — student registration
+- `ثبت‌نام معلم` — dedicated teacher registration portal with email verification and any configured teacher-verification step
+- `پیوستن به کلاس` — class invitation landing page; preserves the target class through sign-up/sign-in
+
 **Core flows:**
 
 1. **Course → Topic → Note:** create a course, add a topic, author a lecture note, save and export to PDF.
 2. **Course → Topic → Question:** select type, enter question, answers and default points; validate and save.
 3. **Import:** upload/paste JSON or structured Markdown → validate → view questions and errors → choose destination topic → approve import.
 4. **Exam:** choose course → filter/select questions → reorder → override points → preview → save → export student PDF and teacher PDF.
+5. **Create class:** choose a course → create a named class group → generate/revoke a class-specific invitation link → review join requests → approve/reject/remove students.
+6. **Publish content:** choose a note or one or more questions → select target classes → optionally permit answer downloads → publish/unpublish.
+7. **Student joins and studies:** open invitation link → register/sign in → request to join → wait for approval → browse published notes/questions → download a question packet without answers or, when the teacher permits it, with answers.
 
 Use search, empty states, save feedback, delete confirmation and loading/error states throughout. Avoid a complicated admin system.
 
-## 4. Content model
+## 4. Accounts, classes and content model
 
-### 4.1 Courses and topics
+### 4.1 Accounts and roles
 
-A course has a title, optional description, teacher owner and status. Each course contains ordered topics; notes and questions belong to a course and topic. Course/topic deletion needs referential-integrity protection or a soft-delete/archive strategy.
+Every person has an authenticated account with exactly one primary role in v1: `teacher` or `student`. Store the role in an application-owned profile record, not only in client-editable authentication metadata. Teachers can create and edit teaching content; students have read-only access to content explicitly published to a class in which they have an approved membership.
 
-### 4.2 Lecture notes
+The teacher registration portal collects at least name, email and password, verifies the email address, records acceptance of the terms/privacy notice and creates a teacher profile. If teacher verification is required for launch, use a small `pending → active/rejected` status workflow; a pending teacher cannot create classes or publish content. Student registration is separate and must not allow a student to self-assign the teacher role. Document the operational owner of teacher approvals before enabling verification in production.
 
-Each note has `title`, `course_id`, `topic_id`, `markdown_content`, timestamps and optional sort order. Support headings, emphasis, lists, tables, links, fenced code and inline/block LaTeX. Preview before save and before export. Markdown is the canonical stored format; sanitize rendered HTML. Support pasted Markdown and `.md` upload. Make images/attachments a later feature unless an object-storage strategy is defined.
+### 4.2 Courses and class groups
 
-### 4.3 Question bank types
+A course is reusable academic content owned by one teacher. A course may contain multiple class groups—for example, five separately managed groups of the same course. A class has a teacher owner, course, name/section, optional academic year/term and status.
+
+Each class can have one active invitation token/link at a time. Store only a hash of the token, allow the teacher to rotate or revoke it, and optionally support an expiry date and maximum uses. Opening the link identifies the class but does not grant access. An authenticated student submits a join request; the owning teacher approves or rejects it. Approved students become class members. Teachers can view pending requests, approve/reject them, remove members and regenerate the link. Membership and request uniqueness must prevent duplicates for the same student/class.
+
+### 4.3 Topics
+
+A course has a title, optional description, teacher owner and status. Each course contains ordered topics; notes and questions belong to a course and topic. Course/topic deletion needs referential-integrity protection or a soft-delete/archive strategy. A student does not gain access to every course item merely by joining a class; publication is explicit.
+
+### 4.4 Lecture notes
+
+Each note has `title`, `course_id`, `topic_id`, `markdown_content`, timestamps and optional sort order. Notes start as private drafts. A teacher can publish a note to one or more class groups belonging to the same course and can later unpublish it. Support headings, emphasis, lists, tables, links, fenced code and inline/block LaTeX. Preview before save and before export. Markdown is the canonical stored format; sanitize rendered HTML. Support pasted Markdown and `.md` upload. Make images/attachments a later feature unless an object-storage strategy is defined.
+
+### 4.5 Question bank types
 
 | Type (API enum) | Persian UI | Answer model |
 |---|---|---|
@@ -111,15 +147,23 @@ Each note has `title`, `course_id`, `topic_id`, `markdown_content`, timestamps a
 | `matching` | وصل‌کردنی | Pair mappings |
 | `ordering` (optional) | مرتب‌سازی | Ordered item IDs |
 
-Questions have: `id`, `course_id`, `topic_id`, `type`, `body_markdown`, `options` (JSONB), `answer_data` (JSONB), `explanation_markdown`, `default_points` (NUMERIC), `difficulty`, `tags`, `created_at`, `updated_at`. Keep answers **separate** from the rendered question body so student exports can never accidentally reveal them. Question editing should have a live preview and a duplicate action.
+Questions have: `id`, `course_id`, `topic_id`, `type`, `body_markdown`, optional `image_key`, `image_alt_text`, `options` (JSONB), `answer_data` (JSONB), `explanation_markdown`, `default_points` (NUMERIC), `difficulty`, `tags`, `created_at`, `updated_at`. Each question may have **at most one image**. Teachers can upload, replace or remove it and must provide useful Persian alternative text when an image is present. Questions remain private until explicitly published to one or more classes. Keep answers **separate** from the rendered question body so student views and no-answer exports can never accidentally reveal them. Question editing should have a live preview and a duplicate action.
 
-### 4.4 Exam builder
+Store question images in private object storage rather than the application filesystem. Accept only validated JPEG, PNG or WebP files within a configured size and pixel limit; verify the decoded file type, generate a safe storage key and strip unsafe metadata. Serve images through an authorized endpoint or short-lived signed URL so only the owning teacher or a student with access to an active publication can view them. Include the image in both permitted question PDF variants.
+
+### 4.6 Student publication and downloads
+
+Use explicit publication records for notes and questions rather than a single global `is_visible` flag. Each publication identifies the resource, target class, publishing teacher, publish time and status. A question publication also has `answers_available` (default `false`). This supports different visibility rules across five or more classes in one course without duplicating content.
+
+Students can list and view only publications targeting classes where their membership is approved. They can download selected available questions as a polished PDF without answers. The “with answers” download option appears and succeeds only when every selected question is published with `answers_available = true`; enforce this again on the server. Downloads must not expose drafts, other classes, answer JSON, model answers or explanations through API payloads, HTML, PDF metadata or hidden text. Teachers can preview both variants before publishing.
+
+### 4.7 Exam builder
 
 An exam has `title`, `course_id`, optional instructions, date/duration/header settings and ordered question entries. Each entry stores a **DECIMAL / NUMERIC** `assigned_points`, not a float. Support fractional increments (e.g. `0.25`) and configurable precision; calculate totals using Python `Decimal`/PostgreSQL `NUMERIC`. Reordering by drag-and-drop (with accessible move-up/down controls) should not affect question bank order.
 
 **Snapshot requirement:** save each selected question's printable body, options, answers and explanation as a snapshot in `exam_questions` at the time of adding/publishing. This keeps existing exams stable if bank questions later change. Decide explicitly whether a teacher can refresh a snapshot from the latest bank item.
 
-### 4.5 Exam PDF variants
+### 4.8 Exam PDF variants
 
 **Student copy (`بدون پاسخنامه`):** school/name fields, title, course, optional date/duration, total points, numbered questions, per-question points and space for essays; no answer keys, solution text or hidden answer metadata.
 
@@ -193,25 +237,47 @@ Accept a numeric JSON points value too, but normalize immediately to `Decimal` f
 
 ## 6. Database tables
 
-- `users`: `id`, auth identity, email, timestamps.
+- `users`: `id`, auth identity, email, `role` (`teacher`/`student`), `display_name`, `status`, email-verification/terms timestamps and audit timestamps. The backend controls role assignment.
 - `courses`: `id`, `owner_id`, `title`, `description`, `status`, timestamps.
+- `classes`: `id`, `course_id`, `owner_id`, `name`, `academic_year`, `term`, `status`, timestamps.
+- `class_invites`: `id`, `class_id`, `token_hash`, `expires_at`, `max_uses`, `use_count`, `revoked_at`, timestamps. Never store or log the plain invitation token after creation.
+- `class_join_requests`: `id`, `class_id`, `student_id`, `status` (`pending`/`approved`/`rejected`/`cancelled`), `reviewed_by`, `reviewed_at`, timestamps.
+- `class_memberships`: `id`, `class_id`, `student_id`, `status` (`active`/`removed`), `joined_at`, `removed_at`, with one current membership per student/class.
 - `topics`: `id`, `course_id`, `title`, `description`, `sort_order`.
 - `lecture_notes`: `id`, `course_id`, `topic_id`, `title`, `markdown_content`, timestamps.
-- `questions`: `id`, `course_id`, `topic_id`, `type`, `body_markdown`, `options JSONB`, `answer_data JSONB`, `explanation_markdown`, `default_points NUMERIC(8,2)` (adjust precision if desired), `difficulty`, tags, timestamps.
+- `questions`: `id`, `course_id`, `topic_id`, `type`, `body_markdown`, `image_key` (nullable), `image_alt_text` (nullable), `options JSONB`, `answer_data JSONB`, `explanation_markdown`, `default_points NUMERIC(8,2)` (adjust precision if desired), `difficulty`, tags, timestamps. Enforce at most one image per question in the model and API.
+- `note_publications`: `id`, `note_id`, `class_id`, `published_by`, `published_at`, `unpublished_at`, unique active publication per note/class.
+- `question_publications`: `id`, `question_id`, `class_id`, `published_by`, `answers_available BOOLEAN DEFAULT FALSE`, `published_at`, `unpublished_at`, unique active publication per question/class.
 - `exams`: `id`, `course_id`, `title`, `instructions`, `header_settings JSONB`, timestamps.
 - `exam_questions`: `id`, `exam_id`, `source_question_id` (nullable reference), `position`, `assigned_points NUMERIC(8,2)`, `question_snapshot JSONB`.
 
-Add indexes on common foreign keys and question filters. Add ownership authorization to every query and mutation; authentication alone is insufficient. Use Alembic for migrations.
+Add indexes on common foreign keys, invitation-token hashes, join-request status, active memberships, publication class/resource pairs and question filters. Enforce that classes and publication targets belong to the same course as their content. Add ownership, role, membership and publication authorization to every query and mutation; authentication alone is insufficient. Use Alembic for migrations.
 
 ## 7. Suggested REST API
 
 ```text
 POST   /api/auth/...                       # depends on chosen auth provider
+POST   /api/auth/register/student
+POST   /api/auth/register/teacher          # dedicated teacher registration flow
 GET    /api/courses
 POST   /api/courses
 GET    /api/courses/{id}
 PATCH  /api/courses/{id}
 DELETE /api/courses/{id}
+GET    /api/courses/{id}/classes
+POST   /api/courses/{id}/classes
+GET    /api/classes/{id}
+PATCH  /api/classes/{id}
+POST   /api/classes/{id}/invite            # create or rotate invitation link
+DELETE /api/classes/{id}/invite            # revoke active invitation link
+GET    /api/classes/{id}/join-requests
+POST   /api/classes/{id}/join-requests/{request_id}/approve
+POST   /api/classes/{id}/join-requests/{request_id}/reject
+GET    /api/classes/{id}/students
+DELETE /api/classes/{id}/students/{student_id}
+GET    /api/class-invites/{token}           # safe public invitation summary
+POST   /api/class-invites/{token}/request   # authenticated student requests access
+GET    /api/me/classes                      # approved/pending classes for student
 GET    /api/courses/{id}/topics
 POST   /api/courses/{id}/topics
 PATCH  /api/topics/{id}
@@ -222,11 +288,16 @@ GET    /api/notes/{id}
 PATCH  /api/notes/{id}
 DELETE /api/notes/{id}
 GET    /api/notes/{id}/pdf
+PUT    /api/notes/{id}/publications         # teacher replaces selected class targets
 GET    /api/questions?course_id=&topic_id=&type=&difficulty=&q=
 POST   /api/questions
 GET    /api/questions/{id}
 PATCH  /api/questions/{id}
 DELETE /api/questions/{id}
+PUT    /api/questions/{id}/image            # upload or replace the single image
+GET    /api/questions/{id}/image            # authorized image response or signed redirect
+DELETE /api/questions/{id}/image
+PUT    /api/questions/{id}/publications     # targets plus answers_available per class
 POST   /api/question-imports/preview       # parse and validate, no DB write
 POST   /api/question-imports/commit        # commit validated reviewed items
 GET    /api/exams?course_id=
@@ -236,9 +307,14 @@ PATCH  /api/exams/{id}
 DELETE /api/exams/{id}
 GET    /api/exams/{id}/pdf?include_answers=false
 GET    /api/exams/{id}/pdf?include_answers=true
+GET    /api/student/notes?class_id=&topic_id=
+GET    /api/student/notes/{id}
+GET    /api/student/notes/{id}/pdf
+GET    /api/student/questions?class_id=&topic_id=&type=&q=
+POST   /api/student/question-downloads      # selected IDs; include_answers is authorized server-side
 ```
 
-Pydantic models should validate per-question-type answer shapes. Use pagination for list endpoints as the bank grows. Return localized UI messages from frontend translation strings rather than relying on raw server exceptions.
+Pydantic models should validate per-question-type answer shapes. Use opaque, high-entropy invitation tokens and rate-limit invitation lookup, registration and join requests. Use pagination for list endpoints as the bank grows. Student response schemas must omit all answer fields unless the relevant publication permits answers. Return localized UI messages from frontend translation strings rather than relying on raw server exceptions.
 
 ## 8. Repository layout
 
@@ -249,7 +325,7 @@ teacher-platform/
 │   ├── src/
 │   │   ├── app/             # routes, theme, providers
 │   │   ├── components/      # shared Mantine components
-│   │   ├── features/        # courses, topics, notes, questions, exams
+│   │   ├── features/        # auth, courses, classes, memberships, notes, questions, exams
 │   │   ├── lib/             # API client and utilities
 │   │   └── styles/
 │   ├── package.json
@@ -261,7 +337,7 @@ teacher-platform/
 │   │   ├── db/              # session and models
 │   │   ├── schemas/
 │   │   ├── routers/
-│   │   ├── services/        # import, Markdown, PDF
+│   │   ├── services/        # import, Markdown, image storage, PDF
 │   │   └── templates/       # print HTML/CSS
 │   ├── alembic/
 │   ├── requirements.txt
@@ -304,34 +380,40 @@ teacher-platform/
 
 ## 10. Security and quality
 
-- Require login for content read/write/export; scope every course, topic, note, question and exam to the authorized teacher.
+- Require login for private content read/write/export. Scope every teacher mutation to owned resources, and every student read/download to an active class membership and active publication.
+- Enforce role permissions on the server. Never trust a role, teacher ID, class ID or `answers_available` decision supplied only by the client.
+- Prevent privilege escalation through sign-up: student registration cannot create a teacher account, and any teacher-verification status is application-controlled.
+- Store only hashed class invitation tokens; support expiry, rotation and revocation; rate-limit token lookup and join requests; do not expose student rosters publicly.
+- Ensure approving, rejecting or removing a student affects only the selected class, even when the same course has several class groups.
 - Sanitize Markdown/HTML and protect PDF rendering from untrusted content or remote resource fetching.
 - Keep secret connection strings server-side, never in `VITE_*` variables.
-- Enforce import limits, input validation, unique option IDs and consistent exam totals.
+- Enforce import limits, input validation, unique option IDs, one validated image per question and consistent exam totals.
 - Add database migrations and tests for all answer types and decimal marks.
 - Snapshot exam questions so later bank changes do not alter a saved exam.
-- Verify **student PDFs contain no answer information** (including hidden text / metadata).
+- Verify **student views and PDFs contain no answer information** unless explicitly allowed for that class publication, including hidden text, serialized API fields and metadata.
 - Ensure PDFs render Persian joining correctly, math correctly and do not clip RTL text. Test long essays, multi-page exams, options, tables and fractional marks.
 
 ## 11. Delivery phases
 
-**Phase 1 — Working foundation:** Vite/React/Mantine RTL shell, authentication, FastAPI, Supabase, course/topic CRUD, deployed hello-world integration.
+**Phase 1 — Accounts and working foundation:** Vite/React/Mantine RTL shell, teacher/student authentication and registration, server-controlled roles, FastAPI, Supabase, course/topic CRUD, deployed hello-world integration.
 
-**Phase 2 — Notes:** Markdown persisted in DB, Mantine/Tiptap editor and conversion, import/preview, notes PDF.
+**Phase 2 — Classes and enrollment:** class-group CRUD, secure invitation links, join requests, teacher approval/rejection/removal and separate rosters per class.
 
-**Phase 3 — Question bank:** type-specific manual forms, answer model, filtering/search, editing/duplication, JSON import preview/commit, constrained Markdown import.
+**Phase 3 — Notes and publication:** Markdown persisted in DB, Mantine/Tiptap editor and conversion, import/preview, notes PDF, class-specific publish/unpublish and student note portal.
 
-**Phase 4 — Exams:** select, reorder, decimal scoring, total, snapshots, save/reopen/duplicate.
+**Phase 4 — Question bank and student downloads:** type-specific manual forms, answer model, optional single-image upload/replace/remove, filtering/search, editing/duplication, JSON import preview/commit, constrained Markdown import, class-specific publication and question PDF downloads with answer authorization.
 
-**Phase 5 — Print and polish:** accurate student/teacher PDFs, exam header template, responsive layouts, validation, backups and end-to-end tests.
+**Phase 5 — Exams:** select, reorder, decimal scoring, total, snapshots, save/reopen/duplicate.
+
+**Phase 6 — Print and polish:** accurate student/teacher PDFs, exam header template, responsive layouts, validation, backups and end-to-end tests.
 
 ### Explicitly out of scope (v1)
 
-Student accounts; online exam taking; automatic grading; analytics; attendance; payments; collaborative editing; school-level roles; internal LLM generation; sophisticated file storage; and complex background-job infrastructure.
+Online exam taking; student submissions; automatic grading; analytics; attendance; payments; parent accounts; school-wide administrators/organizations; co-teaching or collaborative editing; internal LLM generation; sophisticated file storage; and complex background-job infrastructure.
 
 ## 12. Build acceptance test
 
-A teacher logs in, creates `ریاضی پایه نهم`, adds topics `معادلات` and `هندسه`, authors a note with RTL text and math, exports the note, imports a reviewed JSON batch, manually edits a multiple-choice and an essay question, filters by topic, makes an exam from selected questions, gives them `0.25`, `1.5`, `2.75` marks, sees the correct sum, saves/reopens the exam, and successfully downloads both Persian A4 versions — one with answers and one without — from the deployed HTTPS site.
+A teacher registers through the teacher portal, verifies the account, logs in and creates `ریاضی پایه نهم` with five separate class groups. The teacher generates a link for one class. A student registers through that link and requests access; the teacher sees the request in the correct class and approves it. The student cannot access any material yet. The teacher adds topics `معادلات` and `هندسه`, authors a note with RTL text and math, imports a reviewed JSON question batch, manually edits a multiple-choice and an essay question, and publishes selected notes/questions only to that class. The student can view and download only those items and cannot see answers. After the teacher enables answers for one published question, the permitted answer variant becomes available without exposing answers for other questions or classes. The teacher also filters by topic, makes an exam from selected questions, gives them `0.25`, `1.5`, `2.75` marks, sees the correct sum, saves/reopens the exam, and successfully downloads both Persian A4 exam versions—one with answers and one without—from the deployed HTTPS site.
 
 ## 13. Official references
 

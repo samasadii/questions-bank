@@ -3,8 +3,21 @@ export type User = { id: string; email: string; display_name: string; role: Role
 export type Course = { id: string; owner_id: string; title: string; description?: string; status: string };
 export type ClassGroup = { id: string; course_id: string; name: string; academic_year?: string; term?: string; status: string };
 export type JoinRequest = { id: string; student_name?: string; student_email?: string; status: string };
-export type Question = { id: string; body_markdown: string; type: string; has_image: boolean; image_alt_text?: string; answers_available?: boolean };
-export type Note = { id: string; title: string; markdown_content: string };
+export type Publication = { class_id: string; answers_available: boolean };
+export type Question = {
+  id: string;
+  course_id: string;
+  body_markdown: string;
+  type: string;
+  has_image: boolean;
+  image_alt_text?: string;
+  answer_data?: Record<string, unknown> | null;
+  explanation_markdown?: string | null;
+  default_points?: string;
+  answers_available?: boolean;
+  publications?: Publication[];
+};
+export type Note = { id: string; title: string; markdown_content: string; publications?: { class_id: string }[] };
 export type ClassMember = { student_id: string; display_name: string; email: string; joined_at: string };
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';

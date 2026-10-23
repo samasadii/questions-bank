@@ -70,6 +70,23 @@ def test_teacher_student_class_publication_and_single_image(tmp_path):
     )
     assert approved.status_code == 200
 
+    note = client.post(
+        "/api/notes",
+        json={"course_id": course["id"], "title": "درس اول", "markdown_content": "# معادله"},
+        headers=teacher_headers,
+    ).json()
+    client.put(
+        f"/api/notes/{note['id']}/publications",
+        json={"targets": [{"class_id": group["id"]}]},
+        headers=teacher_headers,
+    )
+    teacher_notes = client.get(f"/api/notes?course_id={course['id']}", headers=teacher_headers)
+    assert teacher_notes.status_code == 200
+    assert teacher_notes.json()[0]["publications"][0]["class_id"] == group["id"]
+    student_notes = client.get(f"/api/student/notes?class_id={group['id']}", headers=student_headers)
+    assert student_notes.status_code == 200
+    assert student_notes.json()[0]["title"] == "درس اول"
+
     question = client.post(
         "/api/questions",
         json={
@@ -100,6 +117,9 @@ def test_teacher_student_class_publication_and_single_image(tmp_path):
         headers=teacher_headers,
     )
     assert published.status_code == 204
+    teacher_questions = client.get(f"/api/questions?course_id={course['id']}", headers=teacher_headers)
+    assert teacher_questions.status_code == 200
+    assert teacher_questions.json()[0]["publications"][0]["class_id"] == group["id"]
     visible = client.get(f"/api/student/questions?class_id={group['id']}", headers=student_headers)
     assert visible.status_code == 200
     assert visible.json()[0]["answer_data"] is None

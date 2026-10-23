@@ -123,6 +123,14 @@ class NoteOut(ORMModel):
     markdown_content: str
 
 
+class NotePublicationOut(ORMModel):
+    class_id: str
+
+
+class TeacherNoteOut(NoteOut):
+    publications: list[NotePublicationOut] = Field(default_factory=list)
+
+
 class NoteUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     markdown_content: str | None = None
@@ -183,6 +191,15 @@ class QuestionOut(ORMModel):
             data["has_image"] = bool(value.image_key)
             return data
         return value
+
+
+class QuestionPublicationOut(ORMModel):
+    class_id: str
+    answers_available: bool
+
+
+class TeacherQuestionOut(QuestionOut):
+    publications: list[QuestionPublicationOut] = Field(default_factory=list)
 
 
 class PublicationTarget(BaseModel):

@@ -46,11 +46,13 @@ from .schemas import (
     PublicationUpdate,
     QuestionCreate,
     QuestionOut,
+    TeacherQuestionOut,
     QuestionUpdate,
     RegisterInput,
     TokenOut,
     TopicCreate,
     TopicOut,
+    TeacherNoteOut,
     UserOut,
 )
 from .security import create_access_token, hash_password, new_invite_token, token_digest, verify_password
@@ -366,11 +368,19 @@ def create_note(payload: NoteCreate, db: Db, user: CurrentUser) -> LectureNote:
     return note
 
 
-@router.get("/notes", response_model=list[NoteOut])
-def list_notes(course_id: str, db: Db, user: CurrentUser) -> list[LectureNote]:
+@router.get("/notes", response_model=list[TeacherNoteOut])
+def list_notes(course_id: str, db: Db, user: CurrentUser) -> list[dict]:
     require_role(user, Role.teacher)
     owned_course(db, user, course_id)
-    return list(db.scalars(select(LectureNote).where(LectureNote.course_id == course_id)))
+    notes = list(db.scalars(select(LectureNote).where(LectureNote.course_id == course_id)))
+    result = []
+    for note in notes:
+        data = NoteOut.model_validate(note).model_dump()
+        data["publications"] = list(
+            db.scalars(select(NotePublication).where(NotePublication.note_id == note.id))
+        )
+        result.append(data)
+    return result
 
 
 @router.patch("/notes/{note_id}", response_model=NoteOut)
@@ -421,11 +431,19 @@ def create_question(payload: QuestionCreate, db: Db, user: CurrentUser) -> Quest
     return question
 
 
-@router.get("/questions", response_model=list[QuestionOut])
-def list_questions(course_id: str, db: Db, user: CurrentUser) -> list[Question]:
+@router.get("/questions", response_model=list[TeacherQuestionOut])
+def list_questions(course_id: str, db: Db, user: CurrentUser) -> list[dict]:
     require_role(user, Role.teacher)
     owned_course(db, user, course_id)
-    return list(db.scalars(select(Question).where(Question.course_id == course_id)))
+    questions = list(db.scalars(select(Question).where(Question.course_id == course_id)))
+    result = []
+    for question in questions:
+        data = QuestionOut.model_validate(question).model_dump()
+        data["publications"] = list(
+            db.scalars(select(QuestionPublication).where(QuestionPublication.question_id == question.id))
+        )
+        result.append(data)
+    return result
 
 
 @router.patch("/questions/{question_id}", response_model=QuestionOut)

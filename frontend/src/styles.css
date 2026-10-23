@@ -30,11 +30,15 @@ body { margin: 0; min-width: 320px; min-height: 100vh; font-family: Vazirmatn, s
 .markdown-preview .katex-display { direction: ltr; overflow-x: auto; overflow-y: hidden; padding-block: .65rem; }
 .note-workspace { overflow: visible; }
 .note-toolbar { position: sticky; top: 4.25rem; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border-bottom: 1px solid #dee2e6; border-radius: .5rem .5rem 0 0; background: rgba(255,255,255,.96); backdrop-filter: blur(10px); }
+.note-mode-switch { flex: 0 0 18rem; }
+.note-mode-switch .mantine-SegmentedControl-control { flex: 1 1 50%; min-width: 0; }
+.note-mode-switch .mantine-SegmentedControl-label { width: 100%; padding-inline: .75rem; }
 .note-workspace-body { padding: 1.25rem; }
 .note-workspace-body > .markdown-preview { min-height: 65vh; padding: 1.5rem clamp(1rem, 3vw, 3rem); border: 0; background: white; font-size: 1.05rem; line-height: 2; }
-.w-md-editor, .w-md-editor-text, .w-md-editor-text-input, .w-md-editor-text-pre { font-family: Vazirmatn, sans-serif !important; }
-.w-md-editor-text-input, .w-md-editor-text-pre { direction: rtl !important; text-align: right !important; line-height: 1.9 !important; }
-.w-md-editor-toolbar { direction: ltr; }
+.milkdown-editor { min-height: 68vh; border: 1px solid #dce3e7; border-radius: .75rem; overflow: hidden; background: white; }
+.milkdown-editor .milkdown { min-height: 68vh; --crepe-font-default: Vazirmatn, sans-serif; --crepe-font-title: Vazirmatn, sans-serif; --crepe-font-code: ui-monospace, SFMono-Regular, Menlo, monospace; --crepe-color-primary: #315b7c; --crepe-color-on-primary: #fff; --crepe-color-surface: #fff; --crepe-color-on-surface: #183247; }
+.milkdown-editor .ProseMirror { min-height: 62vh; direction: rtl; text-align: right; font-family: Vazirmatn, sans-serif; line-height: 2; }
+.milkdown-editor .milkdown-toolbar, .milkdown-editor .milkdown-top-bar { direction: rtl; font-family: Vazirmatn, sans-serif; }
 .question-card { padding: 1.25rem; }
 .answer-box { border: 0; border-right: 4px solid #16877c; background: #f0f8f6; }
 .question-image { display: block; max-width: 100%; max-height: 22rem; object-fit: contain; margin: 1rem auto 0; border-radius: .75rem; }
@@ -44,6 +48,7 @@ body { margin: 0; min-width: 320px; min-height: 100vh; font-family: Vazirmatn, s
   .notes-list { position: static; }
   .note-toolbar { top: 4.25rem; align-items: stretch; flex-direction: column; }
   .note-toolbar > .mantine-Group-root { justify-content: space-between; }
+  .note-mode-switch { flex-basis: auto; width: 100%; }
 }
 
 @media (max-width: 40rem) {

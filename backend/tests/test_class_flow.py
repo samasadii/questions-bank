@@ -52,9 +52,10 @@ def test_teacher_student_class_publication_and_single_image(tmp_path):
     course = client.post("/api/courses", json={"title": "ریاضی نهم"}, headers=teacher_headers).json()
     group = client.post(
         f"/api/courses/{course['id']}/classes",
-        json={"name": "کلاس ۹/الف"},
+        json={"name": "کلاس ۹/الف", "school_name": "دبیرستان فرهنگ"},
         headers=teacher_headers,
     ).json()
+    assert group["school_name"] == "دبیرستان فرهنگ"
     invite = client.post(f"/api/classes/{group['id']}/invite", headers=teacher_headers).json()
     join_request = client.post(
         f"/api/class-invites/{invite['token']}/request", headers=student_headers

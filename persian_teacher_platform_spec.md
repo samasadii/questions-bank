@@ -122,7 +122,7 @@ The teacher registration portal collects at least name, email and password, veri
 
 ### 4.2 Courses and class groups
 
-A course is reusable academic content owned by one teacher. A course may contain multiple class groups—for example, five separately managed groups of the same course. A class has a teacher owner, course, name/section, optional academic year/term and status.
+A course is reusable academic content owned by one teacher. A course may contain multiple class groups—for example, five separately managed groups of the same course. A class has a teacher owner, course, name/section, optional school name, optional academic year and status.
 
 Each class can have one active invitation token/link at a time. Store only a hash of the token, allow the teacher to rotate or revoke it, and optionally support an expiry date and maximum uses. Opening the link identifies the class but does not grant access. An authenticated student submits a join request; the owning teacher approves or rejects it. Approved students become class members. Teachers can view pending requests, approve/reject them, remove members and regenerate the link. Membership and request uniqueness must prevent duplicates for the same student/class.
 
@@ -239,7 +239,7 @@ Accept a numeric JSON points value too, but normalize immediately to `Decimal` f
 
 - `users`: `id`, auth identity, email, `role` (`teacher`/`student`), `display_name`, `status`, email-verification/terms timestamps and audit timestamps. The backend controls role assignment.
 - `courses`: `id`, `owner_id`, `title`, `description`, `status`, timestamps.
-- `classes`: `id`, `course_id`, `owner_id`, `name`, `academic_year`, `term`, `status`, timestamps.
+- `classes`: `id`, `course_id`, `owner_id`, `name`, `school_name`, `academic_year`, `status`, timestamps.
 - `class_invites`: `id`, `class_id`, `token_hash`, `expires_at`, `max_uses`, `use_count`, `revoked_at`, timestamps. Never store or log the plain invitation token after creation.
 - `class_join_requests`: `id`, `class_id`, `student_id`, `status` (`pending`/`approved`/`rejected`/`cancelled`), `reviewed_by`, `reviewed_at`, timestamps.
 - `class_memberships`: `id`, `class_id`, `student_id`, `status` (`active`/`removed`), `joined_at`, `removed_at`, with one current membership per student/class.

@@ -52,7 +52,7 @@ class CourseOut(ORMModel):
 class ClassCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     academic_year: str | None = Field(default=None, max_length=30)
-    term: str | None = Field(default=None, max_length=50)
+    school_name: str | None = Field(default=None, max_length=120)
 
 
 class ClassOut(ORMModel):
@@ -61,7 +61,7 @@ class ClassOut(ORMModel):
     owner_id: str
     name: str
     academic_year: str | None
-    term: str | None
+    school_name: str | None
     status: str
 
 

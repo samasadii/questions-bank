@@ -1,7 +1,7 @@
 export type Role = 'teacher' | 'student';
 export type User = { id: string; email: string; display_name: string; role: Role; status: string };
 export type Course = { id: string; owner_id: string; title: string; description?: string; status: string };
-export type ClassGroup = { id: string; course_id: string; name: string; academic_year?: string; term?: string; status: string };
+export type ClassGroup = { id: string; course_id: string; name: string; academic_year?: string; school_name?: string; status: string };
 export type JoinRequest = { id: string; student_name?: string; student_email?: string; status: string };
 export type Publication = { class_id: string; answers_available: boolean };
 export type Question = {

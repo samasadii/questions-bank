@@ -66,7 +66,8 @@ class ClassGroup(Base):
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
     academic_year: Mapped[str | None] = mapped_column(String(30))
-    term: Mapped[str | None] = mapped_column(String(50))
+    # Keep the existing physical column name for local database compatibility.
+    school_name: Mapped[str | None] = mapped_column("term", String(120))
     status: Mapped[str] = mapped_column(String(30), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

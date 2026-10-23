@@ -57,3 +57,17 @@ export async function downloadQuestions(classId: string, ids: string[], includeA
   anchor.click();
   URL.revokeObjectURL(url);
 }
+
+export async function downloadNotePdf(noteId: string, title: string) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/api/notes/${noteId}/pdf`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? 'دانلود جزوه ناموفق بود');
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${title}.pdf`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

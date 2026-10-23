@@ -12,3 +12,8 @@ frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
 
+# Private source material imported into the local database.
+content/
+output/
+tmp/
+

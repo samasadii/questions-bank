@@ -7,13 +7,13 @@ import {
 import { notifications } from '@mantine/notifications';
 import {
   IconBook2, IconBooks, IconCheck, IconClipboardText, IconCopy, IconDoorEnter,
-  IconHome, IconLink, IconLogout, IconPhoto, IconPlus, IconSchool, IconTrash,
+  IconDownload, IconHome, IconLink, IconLogout, IconPhoto, IconPlus, IconSchool, IconTrash,
   IconUsers, IconX,
 } from '@tabler/icons-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
-  API_BASE, api, ClassGroup, ClassMember, Course, downloadQuestions, getToken,
+  API_BASE, api, ClassGroup, ClassMember, Course, downloadNotePdf, downloadQuestions, getToken,
   JoinRequest, Note, Question, Role, setToken, User,
 } from './api';
 
@@ -52,6 +52,27 @@ function QuestionImage({ question }: { question: Question }) {
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [question.id, question.has_image]);
   return source ? <img className="question-image" src={source} alt={question.image_alt_text ?? ''} /> : null;
+}
+
+function AuthenticatedMarkdownImage({ src, alt }: { src?: string; alt?: string }) {
+  const [source, setSource] = useState<string>();
+  useEffect(() => {
+    if (!src) return;
+    if (!src.startsWith('/api/notes/')) { setSource(src); return; }
+    let objectUrl: string | undefined;
+    fetch(`${API_BASE}${src}`, { headers: { Authorization: `Bearer ${getToken()}` } })
+      .then(response => { if (!response.ok) throw new Error(); return response.blob(); })
+      .then(blob => { objectUrl = URL.createObjectURL(blob); setSource(objectUrl); })
+      .catch(() => setSource(undefined));
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [src]);
+  return source ? <img src={source} alt={alt ?? ''} /> : null;
+}
+
+function MarkdownPreview({ markdown, compact = false }: { markdown: string; compact?: boolean }) {
+  return <div className={`markdown-preview${compact ? ' compact' : ''}`}>
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ img: ({ src, alt }) => <AuthenticatedMarkdownImage src={src} alt={alt ?? undefined} /> }}>{markdown}</ReactMarkdown>
+  </div>;
 }
 
 function Auth({ onAuth }: { onAuth: (user: User) => void }) {
@@ -130,7 +151,7 @@ function NotesSection({ courses }: { courses: Course[] }) {
   async function setVisibility(visible: boolean) { if (!selected || !classId) return; const targets = (selected.publications ?? []).filter(item => item.class_id !== classId); if (visible) targets.push({ class_id: classId }); try { await api(`/notes/${selected.id}/publications`, { method: 'PUT', body: JSON.stringify({ targets }) }); await load(courseId, selected.id); } catch (error) { report(error); } }
   const noteVisible = Boolean(selected?.publications?.some(item => item.class_id === classId));
   return <><PageTitle title="جزوه‌ها" description="جزوه‌های موجود در پایگاه داده را ویرایش، پیش‌نمایش و برای کلاس‌ها منتشر کنید." /><Paper withBorder p="lg" mb="lg"><SimpleGrid cols={{ base: 1, sm: 2 }}><CoursePicker courses={courses} value={courseId} onChange={value => void load(value)} /><Select label="کلاس برای تنظیم نمایش" placeholder="یک کلاس انتخاب کنید" value={classId} onChange={setClassId} data={classes.map(group => ({ value: group.id, label: group.name }))} /></SimpleGrid></Paper>
-    {!notes.length ? <EmptyState title="جزوه‌ای در پایگاه داده نیست" description="در این مرحله جزوه‌ها فقط از پایگاه داده اضافه می‌شوند. پس از اضافه‌شدن، ویرایشگر اینجا فعال است." /> : <div className="notes-layout"><Paper withBorder p="sm" className="notes-list"><Text fw={800} p="sm">جزوه‌های دوره</Text>{notes.map(note => <NavLink key={note.id} label={note.title} active={selected?.id === note.id} onClick={() => choose(note)} leftSection={<IconBook2 size={18} />} />)}</Paper><Paper withBorder p="lg">{selected ? <Stack><Group justify="space-between"><Title order={3}>ویرایش جزوه</Title><Group><Switch disabled={!classId} checked={noteVisible} onChange={event => void setVisibility(event.currentTarget.checked)} label="نمایش برای کلاس" /><Button onClick={save}>ذخیره تغییرات</Button></Group></Group><TextInput label="عنوان" value={title} onChange={e => setTitle(e.currentTarget.value)} /><div className="markdown-grid"><Textarea label="Markdown" autosize minRows={18} value={markdown} onChange={e => setMarkdown(e.currentTarget.value)} /><Box><Text size="sm" fw={600} mb={6}>پیش‌نمایش</Text><div className="markdown-preview"><ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown></div></Box></div></Stack> : <EmptyState title="یک جزوه انتخاب کنید" description="برای بازکردن ویرایشگر روی نام جزوه کلیک کنید." />}</Paper></div>}
+    {!notes.length ? <EmptyState title="جزوه‌ای در پایگاه داده نیست" description="در این مرحله جزوه‌ها فقط از پایگاه داده اضافه می‌شوند. پس از اضافه‌شدن، ویرایشگر اینجا فعال است." /> : <div className="notes-layout"><Paper withBorder p="sm" className="notes-list"><Text fw={800} p="sm">جزوه‌های دوره</Text>{notes.map(note => <NavLink key={note.id} label={note.title} active={selected?.id === note.id} onClick={() => choose(note)} leftSection={<IconBook2 size={18} />} />)}</Paper><Paper withBorder p="lg">{selected ? <Stack><Group justify="space-between"><Title order={3}>ویرایش جزوه</Title><Group><Button variant="light" leftSection={<IconDownload size={17} />} onClick={() => void downloadNotePdf(selected.id, title).catch(report)}>دانلود PDF</Button><Switch disabled={!classId} checked={noteVisible} onChange={event => void setVisibility(event.currentTarget.checked)} label="نمایش برای کلاس" /><Button onClick={save}>ذخیره تغییرات</Button></Group></Group><TextInput label="عنوان" value={title} onChange={e => setTitle(e.currentTarget.value)} /><div className="markdown-grid"><Textarea label="Markdown" autosize minRows={18} value={markdown} onChange={e => setMarkdown(e.currentTarget.value)} /><Box><Text size="sm" fw={600} mb={6}>پیش‌نمایش</Text><MarkdownPreview markdown={markdown} /></Box></div></Stack> : <EmptyState title="یک جزوه انتخاب کنید" description="برای بازکردن ویرایشگر روی نام جزوه کلیک کنید." />}</Paper></div>}
   </>;
 }
 
@@ -189,7 +210,7 @@ function StudentApp({ user, logout }: { user: User; logout: () => void }) {
   const load = () => api<ClassGroup[]>('/me/classes').then(setClasses).catch(report); useEffect(() => { void load(); }, []);
   async function join() { try { await api(`/class-invites/${token}/request`, { method: 'POST' }); notify('درخواست ارسال شد', 'پس از تأیید معلم، کلاس نمایش داده می‌شود.'); } catch (error) { report(error); } }
   async function open(group: ClassGroup) { setActiveClass(group.id); try { const [availableQuestions, availableNotes] = await Promise.all([api<Question[]>(`/student/questions?class_id=${group.id}`), api<Note[]>(`/student/notes?class_id=${group.id}`)]); setQuestions(availableQuestions); setNotes(availableNotes); } catch (error) { report(error); } }
-  return <AppShell header={{ height: 68 }} padding="xl"><AppShell.Header><Group h="100%" px="xl" justify="space-between"><Group><div className="logo">هـ</div><div><Text fw={800}>هم‌درس</Text><Text size="xs" c="dimmed">پنل دانش‌آموز</Text></div></Group><Button variant="subtle" color="gray" leftSection={<IconLogout size={18} />} onClick={logout}>خروج</Button></Group></AppShell.Header><AppShell.Main><Container size="lg" py="xl"><PageTitle title={`سلام ${user.display_name}`} description="کلاس‌ها و محتوای منتشرشده برای شما" /><Paper withBorder p="lg" mb="xl"><Group align="flex-end"><TextInput className="grow" label="کد یا پیوند دعوت" value={token} onChange={e => setInviteToken(e.currentTarget.value)} /><Button leftSection={<IconDoorEnter size={18} />} onClick={join} disabled={!token}>ارسال درخواست</Button></Group></Paper><SimpleGrid cols={{ base: 1, md: 3 }}>{classes.map(group => <Card key={group.id} withBorder className="course-card"><ThemeIcon variant="light" color="teal" size={44}><IconSchool /></ThemeIcon><Title order={3} mt="md">{group.name}</Title><Button mt="lg" variant="light" onClick={() => open(group)}>مشاهده محتوا</Button></Card>)}</SimpleGrid>{activeClass && <SimpleGrid cols={{ base: 1, lg: 2 }} mt="xl"><Paper withBorder p="lg"><Title order={2}>جزوه‌ها</Title>{notes.map(note => <Card key={note.id} bg="gray.0" mt="md"><Title order={4}>{note.title}</Title><div className="markdown-preview compact"><ReactMarkdown remarkPlugins={[remarkGfm]}>{note.markdown_content}</ReactMarkdown></div></Card>)}</Paper><Paper withBorder p="lg"><Title order={2}>سؤال‌ها</Title>{questions.map((question, index) => <Card key={question.id} bg="gray.0" mt="md"><Text fw={700}>{index + 1}. {question.body_markdown}</Text><QuestionImage question={question} /></Card>)}{!!questions.length && <Group mt="lg"><Button onClick={() => downloadQuestions(activeClass, questions.map(question => question.id), false)}>دانلود بدون پاسخ</Button><Button variant="light" onClick={() => downloadQuestions(activeClass, questions.map(question => question.id), true)} disabled={questions.some(question => !question.answers_available)}>دانلود با پاسخ</Button></Group>}</Paper></SimpleGrid>}</Container></AppShell.Main></AppShell>;
+  return <AppShell header={{ height: 68 }} padding="xl"><AppShell.Header><Group h="100%" px="xl" justify="space-between"><Group><div className="logo">هـ</div><div><Text fw={800}>هم‌درس</Text><Text size="xs" c="dimmed">پنل دانش‌آموز</Text></div></Group><Button variant="subtle" color="gray" leftSection={<IconLogout size={18} />} onClick={logout}>خروج</Button></Group></AppShell.Header><AppShell.Main><Container size="lg" py="xl"><PageTitle title={`سلام ${user.display_name}`} description="کلاس‌ها و محتوای منتشرشده برای شما" /><Paper withBorder p="lg" mb="xl"><Group align="flex-end"><TextInput className="grow" label="کد یا پیوند دعوت" value={token} onChange={e => setInviteToken(e.currentTarget.value)} /><Button leftSection={<IconDoorEnter size={18} />} onClick={join} disabled={!token}>ارسال درخواست</Button></Group></Paper><SimpleGrid cols={{ base: 1, md: 3 }}>{classes.map(group => <Card key={group.id} withBorder className="course-card"><ThemeIcon variant="light" color="teal" size={44}><IconSchool /></ThemeIcon><Title order={3} mt="md">{group.name}</Title><Button mt="lg" variant="light" onClick={() => open(group)}>مشاهده محتوا</Button></Card>)}</SimpleGrid>{activeClass && <SimpleGrid cols={{ base: 1, lg: 2 }} mt="xl"><Paper withBorder p="lg"><Title order={2}>جزوه‌ها</Title>{notes.map(note => <Card key={note.id} bg="gray.0" mt="md"><Group justify="space-between"><Title order={4}>{note.title}</Title><Button size="xs" variant="subtle" leftSection={<IconDownload size={15} />} onClick={() => void downloadNotePdf(note.id, note.title).catch(report)}>PDF</Button></Group><MarkdownPreview markdown={note.markdown_content} compact /></Card>)}</Paper><Paper withBorder p="lg"><Title order={2}>سؤال‌ها</Title>{questions.map((question, index) => <Card key={question.id} bg="gray.0" mt="md"><Text fw={700}>{index + 1}. {question.body_markdown}</Text><QuestionImage question={question} /></Card>)}{!!questions.length && <Group mt="lg"><Button onClick={() => downloadQuestions(activeClass, questions.map(question => question.id), false)}>دانلود بدون پاسخ</Button><Button variant="light" onClick={() => downloadQuestions(activeClass, questions.map(question => question.id), true)} disabled={questions.some(question => !question.answers_available)}>دانلود با پاسخ</Button></Group>}</Paper></SimpleGrid>}</Container></AppShell.Main></AppShell>;
 }
 
 export default function App() {

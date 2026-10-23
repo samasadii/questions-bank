@@ -4,6 +4,7 @@ import io
 import secrets
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse, HTMLResponse
@@ -21,6 +22,7 @@ from .models import (
     Course,
     LectureNote,
     MembershipStatus,
+    NoteImage,
     NotePublication,
     Question,
     QuestionPublication,
@@ -56,6 +58,7 @@ from .schemas import (
     UserOut,
 )
 from .security import create_access_token, hash_password, new_invite_token, token_digest, verify_password
+from .note_pdf import render_note_pdf
 
 
 router = APIRouter(prefix="/api")
@@ -398,6 +401,46 @@ def update_note(note_id: str, payload: NoteUpdate, db: Db, user: CurrentUser) ->
     db.commit()
     db.refresh(note)
     return note
+
+
+def may_view_note(db: Db, user: User, note: LectureNote) -> bool:
+    if user.role == Role.teacher:
+        course = db.get(Course, note.course_id)
+        return bool(course and course.owner_id == user.id)
+    return bool(db.scalar(
+        select(NotePublication)
+        .join(ClassMembership, ClassMembership.class_id == NotePublication.class_id)
+        .where(
+            NotePublication.note_id == note.id,
+            ClassMembership.student_id == user.id,
+            ClassMembership.status == MembershipStatus.active,
+        )
+    ))
+
+
+@router.get("/notes/{note_id}/images/{image_id}")
+def get_note_image(note_id: str, image_id: str, db: Db, user: CurrentUser) -> Response:
+    note = db.get(LectureNote, note_id)
+    image = db.get(NoteImage, image_id)
+    if not note or not image or image.note_id != note.id or not may_view_note(db, user, note):
+        raise HTTPException(status_code=404, detail="تصویر پیدا نشد")
+    return Response(content=image.data, media_type=image.mime_type)
+
+
+@router.get("/notes/{note_id}/pdf")
+def download_note_pdf(note_id: str, db: Db, user: CurrentUser) -> Response:
+    note = db.get(LectureNote, note_id)
+    if not note or not may_view_note(db, user, note):
+        raise HTTPException(status_code=404, detail="جزوه پیدا نشد")
+    course = db.get(Course, note.course_id)
+    images = list(db.scalars(select(NoteImage).where(NoteImage.note_id == note.id)))
+    pdf = render_note_pdf(note, course.title if course else "", images)
+    filename = quote(f"{note.title}.pdf")
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+    )
 
 
 @router.put("/notes/{note_id}/publications", status_code=204)

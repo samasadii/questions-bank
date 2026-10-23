@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, LargeBinary, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -122,6 +122,27 @@ class LectureNote(Base):
     markdown_content: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class NoteImage(Base):
+    __tablename__ = "note_images"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    note_id: Mapped[str] = mapped_column(ForeignKey("lecture_notes.id"), index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    mime_type: Mapped[str] = mapped_column(String(100))
+    alt_text: Mapped[str | None] = mapped_column(String(500))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ContentImport(Base):
+    __tablename__ = "content_imports"
+    __table_args__ = (UniqueConstraint("source_path", name="uq_content_import_source_path"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    source_path: Mapped[str] = mapped_column(String(500), index=True)
+    source_hash: Mapped[str] = mapped_column(String(64))
+    note_id: Mapped[str] = mapped_column(ForeignKey("lecture_notes.id"), unique=True, index=True)
+    imported_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class Question(Base):

@@ -108,7 +108,6 @@ def _story(
 ) -> list:
     styles = _styles(font_name, bold_name)
     story: list = [
-        _paragraph("هم‌درس  |  جزوهٔ آموزشی", styles["meta"]),
         _paragraph(note.title, styles["h1"]),
         _paragraph(course_title, styles["meta"]),
         Spacer(1, 2 * mm),
@@ -229,7 +228,6 @@ def render_note_pdf(note: LectureNote, course_title: str, images: list[NoteImage
         topMargin=18 * mm,
         bottomMargin=18 * mm,
         title=note.title,
-        author="هم‌درس",
     )
     document.build(_story(note, course_title, images, font_name, bold_name), onFirstPage=_page_footer, onLaterPages=_page_footer)
     return output.getvalue()
@@ -250,22 +248,18 @@ def render_course_pdf(
         topMargin=18 * mm,
         bottomMargin=18 * mm,
         title=f"{course_title} - همهٔ فصل‌ها",
-        author="هم‌درس",
     )
     story: list = [
         Spacer(1, 25 * mm),
-        _paragraph("هم‌درس", styles["meta"]),
         _paragraph(course_title, styles["cover"]),
-        _paragraph("مجموعهٔ کامل جزوه‌های دوره", styles["h2"]),
         Spacer(1, 5 * mm),
         HRFlowable(width="100%", thickness=2, color=colors.HexColor("#315b7c")),
         Spacer(1, 12 * mm),
-        _paragraph(f"شامل {len(notes_with_images)} فصل", styles["meta"]),
         PageBreak(),
         _paragraph("فهرست فصل‌ها", styles["h1"]),
     ]
-    for index, (note, _) in enumerate(notes_with_images, start=1):
-        story.append(_paragraph(f"{index}. {note.title}", styles["body"]))
+    for note, _ in notes_with_images:
+        story.append(_paragraph(f"- {note.title}", styles["body"]))
     for note, images in notes_with_images:
         story.append(PageBreak())
         story.extend(_story(note, course_title, images, font_name, bold_name))
